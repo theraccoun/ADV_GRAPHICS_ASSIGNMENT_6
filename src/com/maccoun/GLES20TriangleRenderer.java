@@ -16,12 +16,9 @@
 
 package com.maccoun;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.util.regex.MatchResult;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -39,18 +36,21 @@ import android.util.Log;
 
 class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
 
+    private int ranPositionHandle;
+
     public GLES20TriangleRenderer(Context context) {
         mContext = context;
-        mTriangleVertices = ByteBuffer.allocateDirect(mTriangleVerticesData.length
+        mSquareArrayStructVertBuf = ByteBuffer.allocateDirect(mTriangleVerticesData.length
                 * FLOAT_SIZE_BYTES).order(ByteOrder.nativeOrder()).asFloatBuffer();
-        mTriangleVertices.put(mTriangleVerticesData).position(0);
+        mSquareArrayStructVertBuf.put(mTriangleVerticesData).position(0);
 
-        mSquareVerticesBuffer = ByteBuffer.allocateDirect(mSquareVerticesData.length * FLOAT_SIZE_BYTES).
+        mSquareStructArrayVerticesBuffer = ByteBuffer.allocateDirect(mSquareVerticesData.length * FLOAT_SIZE_BYTES).
                 order(ByteOrder.nativeOrder()).asFloatBuffer();
-        mSquareVerticesBuffer.put(mSquareVerticesData).position(0);
+        mSquareStructArrayVerticesBuffer.put(mSquareVerticesData).position(0);
         textureVerticesBuffer = ByteBuffer.allocateDirect(textureVertices.length * FLOAT_SIZE_BYTES).
                 order(ByteOrder.nativeOrder()).asFloatBuffer();
         textureVerticesBuffer.put(textureVertices).position(0);
+
     }
 
     public void onDrawFrame(GL10 glUnused) {
@@ -63,26 +63,51 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
 
         calculateFPS();
 
-        Matrix.setIdentityM(mMMatrix, 0);
-        Matrix.translateM(mMMatrix, 0, -0.6f, -0.7f, 0.0f);
-        Matrix.rotateM(mMMatrix, 0, 90, 0.0f, 0.0f, 1.0f);
+        if(!isAlgTexShader){
+            GLES20.glUseProgram(mProgram);
 
-        Matrix.multiplyMM(mMVPMatrix, 0, mVMatrix, 0, mMMatrix, 0);
-        Matrix.multiplyMM(mMVPMatrix, 0, mProjMatrix, 0, mMVPMatrix, 0);
+            Matrix.setIdentityM(mMMatrix, 0);
+            Matrix.translateM(mMMatrix, 0, -0.6f, -0.7f, 0.0f);
+            Matrix.rotateM(mMMatrix, 0, 90, 0.0f, 0.0f, 1.0f);
 
-        GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mMVPMatrix, 0);
-        drawHand(true, true);
+            Matrix.multiplyMM(mMVPMatrix, 0, mVMatrix, 0, mMMatrix, 0);
+            Matrix.multiplyMM(mMVPMatrix, 0, mProjMatrix, 0, mMVPMatrix, 0);
 
-        Matrix.setIdentityM(mMMatrix, 0);
-        Matrix.translateM(mMMatrix,  0, 0.0f, 0.5f, 0.0f);
-        Matrix.rotateM(mMMatrix, 0, 90, 0.0f, 0.0f, 1.0f);
-        Matrix.multiplyMM(mMVPMatrix, 0, mVMatrix, 0, mMMatrix, 0);
-        Matrix.multiplyMM(mMVPMatrix, 0, mProjMatrix, 0, mMVPMatrix, 0);
+            GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mMVPMatrix, 0);
+            drawHand(true, true);
 
-        GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mMVPMatrix, 0);
+            Matrix.setIdentityM(mMMatrix, 0);
+            Matrix.translateM(mMMatrix,  0, 0.0f, 0.5f, 0.0f);
+            Matrix.rotateM(mMMatrix, 0, 90, 0.0f, 0.0f, 1.0f);
+            Matrix.multiplyMM(mMVPMatrix, 0, mVMatrix, 0, mMMatrix, 0);
+            Matrix.multiplyMM(mMVPMatrix, 0, mProjMatrix, 0, mMVPMatrix, 0);
+
+            GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mMVPMatrix, 0);
 
 
-        drawDude();
+            drawDude();
+        }
+        else{
+            GLES20.glUseProgram(ranProgram);
+
+            Matrix.setIdentityM(mMMatrix, 0);
+            Matrix.multiplyMM(mMVPMatrix, 0, mVMatrix, 0, mMMatrix, 0);
+            Matrix.multiplyMM(mMVPMatrix, 0, mProjMatrix, 0, mMVPMatrix, 0);
+
+            GLES20.glUniformMatrix4fv(ranMVPMatrixHandle, 1, false, mMVPMatrix, 0);
+
+            Log.i("MEOW", "ranPositionHandle: " + mProgram);
+//
+//            int ran = GLES20.glGetUniformLocation(ranProgram, "random");
+//            Log.i("RAN", "ran: " + ranPositionHandle);
+//            GLES20.glUniform1f(ran, 5);
+            GLES20.glVertexAttribPointer(ranPositionHandle, 3, GLES20.GL_FLOAT, false,
+                    0, mSquareStructArrayVerticesBuffer);
+            GLES20.glEnableVertexAttribArray(ranPositionHandle);
+
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+        }
+
 
 
     }
@@ -92,15 +117,15 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[1]);
 
         if(isArrayStruct){
-            mTriangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET);
+            mSquareArrayStructVertBuf.position(TRIANGLE_VERTICES_DATA_POS_OFFSET);
             GLES20.glVertexAttribPointer(maPositionHandle, 3, GLES20.GL_FLOAT, false,
-                    TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mTriangleVertices);
+                    TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mSquareArrayStructVertBuf);
             checkGlError("glVertexAttribPointer maPosition");
-            mTriangleVertices.position(TRIANGLE_VERTICES_DATA_UV_OFFSET);
+            mSquareArrayStructVertBuf.position(TRIANGLE_VERTICES_DATA_UV_OFFSET);
             GLES20.glEnableVertexAttribArray(maPositionHandle);
             checkGlError("glEnableVertexAttribArray maPositionHandle");
             GLES20.glVertexAttribPointer(maTextureHandle, 2, GLES20.GL_FLOAT, false,
-                    TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mTriangleVertices);
+                    TRIANGLE_VERTICES_DATA_STRIDE_BYTES, mSquareArrayStructVertBuf);
             checkGlError("glVertexAttribPointer maTextureHandle");
             GLES20.glEnableVertexAttribArray(maTextureHandle);
             checkGlError("glEnableVertexAttribArray maTextureHandle");
@@ -108,7 +133,7 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
         }
         else{
             GLES20.glVertexAttribPointer(maPositionHandle, 3, GLES20.GL_FLOAT, false,
-                    0, mSquareVerticesBuffer);
+                    0, mSquareStructArrayVerticesBuffer);
             GLES20.glEnableVertexAttribArray(maPositionHandle);
             checkGlError("glVertexAttribPointer maPosition");
             GLES20.glVertexAttribPointer(maTextureHandle, 2, GLES20.GL_FLOAT, false,
@@ -129,7 +154,7 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0]);
 
         GLES20.glVertexAttribPointer(maPositionHandle, 3, GLES20.GL_FLOAT, false,
-                0, mSquareVerticesBuffer);
+                0, mSquareStructArrayVerticesBuffer);
         GLES20.glEnableVertexAttribArray(maPositionHandle);
         checkGlError("glVertexAttribPointer maPosition");
         GLES20.glVertexAttribPointer(maTextureHandle, 2, GLES20.GL_FLOAT, false,
@@ -167,6 +192,7 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
     public void onSurfaceCreated(GL10 glUnused, EGLConfig config) {
         // Ignore the passed-in GL10 interface, and use the GLES20
         // class's static methods instead.
+
         mProgram = createProgram(mVertexShader, mFragmentShader);
         if (mProgram == 0) {
             return;
@@ -176,8 +202,9 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
         if (maPositionHandle == -1) {
             throw new RuntimeException("Could not get attrib location for aPosition");
         }
-        maTextureHandle = GLES20.glGetAttribLocation(mProgram, "aTextureCoord");
-        checkGlError("glGetAttribLocation aTextureCoord");
+            maTextureHandle = GLES20.glGetAttribLocation(mProgram, "aTextureCoord");
+            checkGlError("glGetAttribLocation aTextureCoord");
+
         if (maTextureHandle == -1) {
             throw new RuntimeException("Could not get attrib location for aTextureCoord");
         }
@@ -189,6 +216,23 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
         }
 
         yPosHandle = GLES20.glGetUniformLocation(mProgram, "ypos");
+
+        ranProgram = createProgram(new AlgVertTexShader().getVShader(), new RanTextFragShader().getFragmentShader());
+
+        Log.i("RANPROG" , "ranProg: " + ranProgram);
+
+
+        ranPositionHandle = GLES20.glGetAttribLocation(ranProgram, "aPosition");
+
+        checkGlError("glGetAttribLocation aPosition");
+        if (ranPositionHandle == -1) {
+            throw new RuntimeException("Could not get attrib location for aPosition");
+        }
+         ranMVPMatrixHandle = GLES20.glGetUniformLocation(ranProgram, "uMVPMatrix");
+        checkGlError("glGetUniformLocation uMVPMatrix");
+        if (ranMVPMatrixHandle== -1) {
+            throw new RuntimeException("Could not get attrib location for uMVPMatrix");
+        }
 
         /*
          * Create our texture. This has to be done each time the
@@ -237,6 +281,8 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
 
 
         Matrix.setLookAtM(mVMatrix, 0, 0, 0, -5, 0f, 0f, 0f, 0f, 1.0f, 0.0f);
+
+
     }
 
     private int loadShader(int shaderType, String source) {
@@ -258,6 +304,7 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
 
     private int createProgram(String vertexSource, String fragmentSource) {
         int vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexSource);
+
         if (vertexShader == 0) {
             return 0;
         }
@@ -294,6 +341,11 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
         }
     }
 
+    public void setIsTexShader(boolean isAlgTex){
+        isAlgTexShader = isAlgTex;
+    }
+
+
     private static final int FLOAT_SIZE_BYTES = 4;
     private static final int TRIANGLE_VERTICES_DATA_STRIDE_BYTES = 5 * FLOAT_SIZE_BYTES;
     private static final int TRIANGLE_VERTICES_DATA_POS_OFFSET = 0;
@@ -314,7 +366,7 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
     };
 
 
-    private FloatBuffer mSquareVerticesBuffer;
+    private FloatBuffer mSquareStructArrayVerticesBuffer;
     private FloatBuffer textureVerticesBuffer;
 
     private final float[] mTriangleVerticesData = {
@@ -325,12 +377,13 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
             0.5f,  0.5f, 0.0f, 0.0f,  0.0f, };
 
 
-    private FloatBuffer mTriangleVertices;
-
-    private final String mVertexShader = new VertexShader().getVShader();
+    private FloatBuffer mSquareArrayStructVertBuf;
 
 
-    private final String mFragmentShader = new FragmentShader().getFragmentShader();
+    private String mVertexShader = new VertexShader().getVShader();
+
+
+    private String mFragmentShader = new FragmentShader().getFragmentShader();
 
     private long time;
     private long lastTime = 0;
@@ -342,11 +395,15 @@ class GLES20TriangleRenderer implements GLSurfaceView.Renderer {
     private float[] mVMatrix = new float[16];
 
     private int mProgram;
+    private int ranProgram;
     private int mTextureID;
     private int muMVPMatrixHandle;
+    private int ranMVPMatrixHandle;
     private int maPositionHandle;
     private int maTextureHandle;
     private int yPosHandle;
+    private boolean isAlgTexShader;
+    private boolean isRandomTex = true;
 
     private int[] textures;
 

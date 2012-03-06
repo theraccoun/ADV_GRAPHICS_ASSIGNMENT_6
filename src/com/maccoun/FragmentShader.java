@@ -10,8 +10,6 @@ package com.maccoun;
 public class FragmentShader {
 
     private static final String fShader =
-
-
              "precision mediump float;\n" +
              "varying vec2 vTextureCoord;\n" +
              "uniform sampler2D sTexture;\n" +
